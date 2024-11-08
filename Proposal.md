@@ -11,14 +11,13 @@ E-sports Players’ Careers, Earnings, and Digital Engagement (Worldwide)
 
 ### Motivation
 
-The COVID-19 pandemic reshaped the e-sports industry, significantly
-impacting players’ earnings, tournament availability, and digital
-engagement strategies. This project aims to analyze these changes to
-understand how players adapted both financially and socially in a
-digital-first environment. By focusing on income fluctuations,
-engagement strategies, and shifts in sponsorships, this study will
-reveal the resilience and adaptability of e-sports players in the face
-of global disruptions.
+This project aims to analyze the evolving landscape of e-sports,
+focusing on patterns in player earnings, differences between online and
+offline tournaments, and engagement strategies across demographics and
+game types. By examining trends in income, age and gender variations,
+and tournament success, this study will reveal key factors influencing
+players’ financial and social adaptability in a digital-first
+environment.
 
 ### Key Research Questions
 
@@ -29,9 +28,6 @@ of global disruptions.
   30, 90, and 365 days? Are there notable fluctuations?
 - Online vs. Offline: What differences are observed between online and
   offline tournament earnings, especially since COVID-19?
-- Demographic and Game-Type Insights: How do earnings and participation
-  vary across age groups, specialized games (e.g., fighting games,
-  mobile), and demographics (e.g., female players)?
 - Tournament Success: Who has the most tournament results, and how does
   this correlate with earnings across different tournament types and
   prize levels?
@@ -54,27 +50,7 @@ of global disruptions.
       information on player earnings from tournaments.
     - [Esports Charts](https://escharts.com/): Tournament statistics and
       viewership.
-2.  **Streaming Metrics**:
-    - **Twitch**: Access streaming metrics via Twitch’s API for data on
-      streams and viewership.
-      - API Documentation: [Twitch
-        Developers](https://dev.twitch.tv/docs/api/)
-    - **YouTube**: YouTube API for video statistics and channel
-      analytics.
-      - API Documentation: [YouTube Data
-        API](https://developers.google.com/youtube/v3)
-3.  **Social Media Engagement Data**:
-    - **Twitter**: Engagement metrics via Twitter’s API.
-      - API Documentation: [Twitter Developer
-        Platform](https://developer.twitter.com/en/docs)
-    - **Facebook**: Engagement metrics using Facebook’s Graph API.
-      - API Documentation: [Facebook for
-        Developers](https://developers.facebook.com/docs/graph-api/)
-    - **Instagram**: Access engagement metrics through the Instagram
-      Graph API.
-      - API Documentation: [Instagram Graph
-        API](https://developers.facebook.com/docs/instagram-api)
-4.  **Sponsorship and Industry Trends**:
+2.  **Sponsorship and Industry Trends**:
     - [Newzoo](https://newzoo.com/): Market research reports on e-sports
       and gaming industries.
     - [Statista](https://www.statista.com/): Industry statistics and
