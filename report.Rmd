@@ -1,0 +1,677 @@
+---
+title: "The trend for e-sports players’ earnings and the story behind e-sport(Worldwide)"
+author: "Xinghao Qiao"
+date: 2024-11-30
+output: github_document
+---
+
+# Motivation
+
+This project aims to analyze the evolving landscape of e-sports, focusing on patterns in player earnings and engagement strategies across demographics and game types. By examining trends in income, age and gender variations, and tournament success, this study will reveal key factors influencing players' financial and social adaptability in a digital-first environment.
+
+
+# Related Work
+
+We are all graduate students in Mailman's Biostatistics Department, and we wanted to do a positive project that combined our shared love of e-Sports gaming. E-games are becoming an increasingly important part of our lives nowadays, not only as a pastime making a break from the stress of our schedules, but also as a livelihood for some. As this may be a common situation in the world, we were inspired to explore the story behind the e-Sports industry.
+
+# Key Questions
+
+- Earnings Patterns: What trends exist in overall earnings, top players' earnings, and earnings by country?
+- Recent Earnings Trends: How have player earnings changed over time?
+- The trends of top games
+
+# Data improting and cleaning
+
+1. **Earnings Data**:
+   - [Esports Earnings](https://www.esportsearnings.com/): Detailed information on player earnings from tournaments.
+   - [Esports Charts](https://escharts.com/): Tournament statistics and viewership.
+   
+However,these data from websites cannot be used directly in the analysis, we need to do data importing and cleaning first. From the [website](https://www.esportsearnings.com/),we have the overall top 100 individuals' e-sports earning.
+
+```{r setup}
+library(rvest)
+library(dplyr)
+library(tidyverse)
+library(httr)
+library(ggplot2)
+library(tidyr)
+library(maps)
+library(knitr)
+library(viridis)
+# esports_earnings_top100_overall
+url <- 'https://www.esportsearnings.com/players'
+webpage <- read_html(url)
+
+
+rank <- webpage %>% html_nodes("tr td:nth-child(1)") %>% html_text(trim = TRUE)
+player_id <- webpage %>% html_nodes("tr td:nth-child(2)") %>% html_text(trim = TRUE)
+player_name <- webpage %>% html_nodes("tr td:nth-child(3)") %>% html_text(trim = TRUE)
+total_earnings <- webpage %>% html_nodes("tr td:nth-child(4)") %>% html_text(trim = TRUE)
+highest_paying_game <- webpage %>% html_nodes("tr td:nth-child(5)") %>% html_text(trim = TRUE)
+total_game_earnings <- webpage %>% html_nodes("tr td:nth-child(6)") %>% html_text(trim = TRUE)
+percent_of_total <- webpage %>% html_nodes("tr td:nth-child(7)") %>% html_text(trim = TRUE)
+
+
+data_overall <- data.frame(
+  Rank = rank,
+  Player_ID = player_id,
+  Player_Name = player_name,
+  Total_Earnings = total_earnings,
+  Highest_Paying_Game = highest_paying_game,
+  Total_Game_Earnings = total_game_earnings,
+  Percent_of_Total = percent_of_total,
+  stringsAsFactors = FALSE
+)
+
+
+data_overall$Rank <- as.numeric(gsub("\\.", "", data_overall$Rank))
+print(data_overall)
+
+write.csv(data_overall, "esports_earnings_top100_overall.csv", row.names = FALSE)
+
+```
+
+And the overall 177 countries' e-sports earning ranking with name of the game and number of players in that game,
+```{r}
+# ranking by countries
+url <- 'https://www.esportsearnings.com/countries'
+webpage <- read_html(url)
+
+
+rows <- webpage %>% html_nodes("tr")
+
+data <- data.frame(
+  Rank = character(),
+  Country = character(),
+  Total_Earnings = character(),
+  Number_of_Players = character(),
+  Top_Game = character(),
+  Earnings_From_Top_Game = character(),
+  Percent_From_Top_Game = character(),
+  stringsAsFactors = FALSE
+)
+
+
+for (row in rows) {
+  
+  columns <- row %>% html_nodes("td") %>% html_text(trim = TRUE)
+  
+  
+  if (length(columns) == 7) {
+    
+    data <- bind_rows(data, as.data.frame(t(columns), stringsAsFactors = FALSE))
+  }
+}
+
+
+colnames(data) <- c("Rank", "Country", "Total_Earnings", "Number_of_Players", 
+                    "Top_Game", "Earnings_From_Top_Game", "Percent_From_Top_Game")
+
+data[, 1:7] <- data[, 8:14]
+
+
+colnames(data)[1:7] <- c("Rank", "Country", "Total_Earnings", "Number_of_Players", 
+                         "Top_Game", "Earnings_From_Top_Game", "Percent_From_Top_Game")
+
+
+data <- data[, 1:7]
+
+data$Rank <- as.numeric(gsub("\\.", "", data$Rank))
+
+print(data)
+
+write.csv(data, "country_overall.csv", row.names = FALSE)
+```
+And the overall top 500 e-sports' player earning in the last 365 days.
+```{r}
+urls <- c(
+  "https://www.esportsearnings.com/players/highest-earnings-last-365-days",
+  "https://www.esportsearnings.com/players/highest-earnings-last-365-days-top-200",
+  "https://www.esportsearnings.com/players/highest-earnings-last-365-days-top-300",
+  "https://www.esportsearnings.com/players/highest-earnings-last-365-days-top-400",
+  "https://www.esportsearnings.com/players/highest-earnings-last-365-days-top-500"
+)
+
+fetch_tables <- function(url) {
+  webpage <- read_html(url)
+  tables <- webpage %>%
+    html_nodes("table.detail_list_table") %>%
+    lapply(html_table, fill = TRUE) %>%
+    bind_rows()  
+  
+  countries <- webpage %>%
+    html_nodes("table.detail_list_table img") %>%  
+    html_attr("title")                             
+  
+  if (length(countries) == nrow(tables)) {
+    tables$Country <- countries  
+  } else {
+    warning("Country count does not match table rows for URL: ", url)
+    tables$Country <- NA  
+  }
+  return(tables)
+}
+
+all_data <- lapply(urls, fetch_tables)
+final_table <- bind_rows(all_data)
+print(final_table)
+
+write.csv(final_table, "top500_365.csv", row.names = FALSE)
+
+```
+Additionally, we found the data in the horizontal time dimension (from 2018 to 2024),
+```{r}
+
+# df
+all_data <- data.frame(
+  Year = integer(),
+  Rank = character(),
+  Country = character(),
+  Total_Earnings = character(),
+  Number_of_Players = character(),
+  stringsAsFactors = FALSE
+)
+
+# from 2018 to 2024
+for (year in 2018:2024) {
+  
+  url <- paste0("https://www.esportsearnings.com/history/", year, "/countries")
+  
+  
+  webpage <- read_html(url)
+  
+  
+  rows <- webpage %>% html_nodes("tr")
+  
+
+  data <- data.frame(
+    Rank = character(),
+    Country = character(),
+    Total_Earnings = character(),
+    Number_of_Players = character(),
+    stringsAsFactors = FALSE
+  )
+  
+ 
+  for (row in rows) {
+    # grab data
+    columns <- row %>% html_nodes("td") %>% html_text(trim = TRUE)
+    
+   
+    if (length(columns) == 4) {
+      
+      data <- bind_rows(data, as.data.frame(t(columns), stringsAsFactors = FALSE))
+    }
+  }
+  
+ 
+  data$Year <- year
+  
+
+  all_data <- bind_rows(all_data, data)
+}
+
+colnames(all_data) <- c("Rank", "Country", "Total_Earnings", "Number_of_Players", "Year")
+
+
+all_data$Year <- all_data$Rank
+
+
+all_data[, 1:4] <- all_data[, 6:9]
+
+
+all_data <- all_data[, c(5, 1:4)]
+
+
+colnames(all_data) <- c("Year", "Current_year_Ranking", "Countries", "Overall_Earnings", "Number_of_Players")
+
+
+all_data$Current_year_Ranking <- as.numeric(gsub("\\.", "", all_data$Current_year_Ranking))
+
+print(head(all_data, 10))
+
+write.csv(all_data, "Earnings_country_2018_2024.csv", row.names = FALSE)
+
+```
+Also, we have data about top games from 2018 to 2024,
+```{r}
+all_data <- data.frame(
+  Year = integer(),
+  Rank = integer(),
+  Game = character(),
+  Total_Earnings = character(),
+  Total_Players = character(),
+  Total_Tournaments = character(),
+  stringsAsFactors = FALSE
+)
+
+# 2018 to 2024
+for (year in 2018:2024) {
+  # URL
+  url <- paste0("https://www.esportsearnings.com/history/", year, "/games")
+  
+  
+  webpage <- read_html(url)
+  
+  # grab table
+  rows <- webpage %>% html_nodes("tr")
+  
+  year_data <- data.frame(
+    Rank = integer(),
+    Game = character(),
+    Total_Earnings = character(),
+    Total_Players = character(),
+    Total_Tournaments = character(),
+    stringsAsFactors = FALSE
+  )
+  
+ 
+  for (row in rows) {
+    
+    columns <- row %>% html_nodes("td") %>% html_text(trim = TRUE)
+    
+   
+    if (length(columns) == 5) {
+      
+      year_data <- bind_rows(year_data, as.data.frame(t(columns), stringsAsFactors = FALSE))
+    }
+  }
+  
+  # add year
+  year_data$Year <- year
+  
+ 
+  all_data <- bind_rows(all_data, year_data)
+}
+
+
+
+all_data[, 6] <- all_data[, 1]
+
+
+all_data[, 1:5] <- all_data[, 7:11]
+
+
+all_data <- all_data[, 1:6]
+
+
+colnames(all_data) <- c("Current_year_Rank", "Game", "Total_Earnings", "Total_Players", "Total_Tournaments", "Year")
+
+
+all_data$Current_year_Rank <- as.numeric(gsub("\\.", "", all_data$Current_year_Rank))
+
+
+print(all_data)
+write.csv(all_data, "Earnings_topgame_2018_2024.csv", row.names = FALSE)
+```
+
+# Exploratory Analysis
+The analysis will be divided into two parts "horizontal comparision" and "longitudinal comparison".
+## Horizontal comparison
+With all the above datasets, let's do the analysis. 
+```{r}
+country_overall <- read.csv("country_overall.csv")
+esports_top100 <- read.csv("esports_earnings_top100_overall.csv")
+top500_365 <- read.csv("top500_365.csv")
+earnings_country <- read.csv("Earnings_country_2018_2024.csv")
+earnings_topgame <- read.csv("Earnings_topgame_2018_2024.csv")
+
+# remove $
+country_overall$Total_Earnings <- as.numeric(gsub("[\\$,]", "", country_overall$Total_Earnings))
+esports_top100$Total_Earnings <- as.numeric(gsub("[\\$,]", "", esports_top100$Total_Earnings))
+top500_365$`Total..Last.365.Days.` <- as.numeric(gsub("[\\$,]", "", top500_365$`Total..Last.365.Days.`))
+earnings_country$Overall_Earnings <- as.numeric(gsub("[\\$,]", "", earnings_country$Overall_Earnings))
+earnings_topgame$Total_Earnings <- as.numeric(gsub("[\\$,]", "", earnings_topgame$Total_Earnings))
+```
+First,we demonstrate a histogram to show the top 10 countries in the world by e-sports earning.
+```{r}
+# Extract the games with the largest percentage of revenue and their revenue
+top_countries <- country_overall %>%
+  arrange(desc(Total_Earnings)) %>%
+  head(10) %>%
+  mutate(
+    Top_Game_Earnings = as.numeric(gsub("[\\$,]", "", Earnings_From_Top_Game)),
+    Player_Count = as.numeric(gsub("[^0-9]", "", Number_of_Players)),  
+    Top_Game_Percent = round((Top_Game_Earnings / Total_Earnings) * 100, 2)  
+  )
+
+# convert to long format
+top_countries_long <- top_countries %>%
+  select(Country, Total_Earnings, Top_Game_Earnings) %>%
+  pivot_longer(
+    cols = c(Total_Earnings, Top_Game_Earnings),
+    names_to = "Earnings_Type",
+    values_to = "Earnings"
+  ) %>%
+  mutate(
+    Earnings_Type = ifelse(Earnings_Type == "Total_Earnings", "Total Earnings", "Top Game Earnings")
+  )
+
+# histogram
+ggplot(top_countries_long, aes(x = reorder(Country, -Earnings), y = Earnings, fill = Earnings_Type)) +
+  geom_bar(stat = "identity", position = "identity", alpha = 0.9) +
+  
+  # top game percent
+  geom_text(
+    data = top_countries,
+    aes(
+      x = Country, y = Total_Earnings,  
+      label = paste0(Top_Game, ": ", Top_Game_Percent, "%")
+    ),
+    inherit.aes = FALSE, vjust = 2, hjust = 0.5,color = "red", size = 1.8  
+  ) +
+  
+  
+  geom_text(
+    data = top_countries,
+    aes(
+      x = Country, y = Total_Earnings ,  
+      label = paste0("#Total Players: ", Player_Count)
+    ),
+    inherit.aes = FALSE, hjust = 1,color = "blue", size = 1.8  
+  ) +
+  
+  coord_flip() +
+  scale_fill_manual(values = c("red", "gold")) +
+  labs(
+    title = "Top 10 Countries by Total Earnings with Top Game",
+    x = "Country", y = "Earnings (USD)", fill = "Earnings Type"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "top",
+    axis.text.y = element_text(size = 10)  
+  )
+
+```
+
+From the histogram,we can find that China has the highest total earnings, amounting to $318962329.26.
+The top contributing game is Dota 2, which generated 85673773.44(usd), accounting for 26.86% of the total earnings. And United States has the most players, with 27993 players.The top game in the US is Fortnite, which contributed 49472179.53(usd), accounting for 17.25% of the total earnings.Additionally,Russian Federation shows the highest percentage contribution from a single game, with Dota 2 contributing 43.21% of the total earnings.
+
+Apart from the country latitude, let‘s now analyze the individual latitude，
+```{r}
+# Extract the top 10 players
+top_players <- esports_top100 %>%
+  arrange(desc(Total_Earnings)) %>%
+  head(10)
+
+# Create a bar chart for the top 10 players by earnings
+ggplot(top_players, aes(x = reorder(Player_Name, Total_Earnings), y = Total_Earnings, fill = Highest_Paying_Game)) +
+  geom_bar(stat = "identity") +
+  geom_text(
+    aes(label = paste0("ID: ", Player_ID, "\n$", formatC(Total_Earnings, format = "f", big.mark = ","))),
+    hjust = 1, size = 3
+  ) +  # Add Player ID and earnings as labels
+  coord_flip() +
+  labs(
+    title = "Top 10 Players by Total Earnings",
+    x = "Player Name",
+    y = "Total Earnings (USD)",
+    fill = "Top Game"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10)
+  )
+```
+All of the top 10 highest-earning games for players are Dota 2, which side-indicates that its prize pool is quite large.Johan Sundstein(id:N0tail) has the highest total earnings of 7184163.05(usd). 
+
+Similar to the above steps, we can use the 'top 500 earnings in the last 365 days' data to analyze the number of players from each country in the top500, their distribution, and related earnings. 
+
+```{r}
+country_summary <- top500_365 %>%
+  group_by(Country) %>%
+  summarise(
+    Player_Count = n(),  # Count the number of players
+    Total_Earnings = sum(`Total..Last.365.Days.`, na.rm = TRUE)  # Sum up earnings
+  ) %>%
+  arrange(desc(Player_Count))  # Sort by the number of players
+
+# Bar chart for player count by country
+ggplot(country_summary, aes(x = reorder(Country, -Player_Count), y = Player_Count)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() +
+  labs(
+    title = "Number of Players by Country (Top 500)",
+    x = "Country",
+    y = "Number of Players"
+  ) +
+  theme_minimal()
+
+# Bar chart for total earnings by country
+ggplot(country_summary, aes(x = reorder(Country, -Total_Earnings), y = Total_Earnings)) +
+  geom_bar(stat = "identity", fill = "gold") +
+  coord_flip() +
+  labs(
+    title = "Total Earnings by Country (Top 500)",
+    x = "Country",
+    y = "Total Earnings (USD)"
+  ) +
+  theme_minimal()
+
+# Summary table for top 500
+country_summary <- top500_365 %>%
+  group_by(Country) %>%
+  summarise(
+    Player_Count = n(),  # Count the number of players
+    Total_Earnings = sum(`Total..Last.365.Days.`, na.rm = TRUE)  # Sum up earnings
+  ) %>%
+  arrange(desc(Player_Count))  # Sort by the number of players
+
+
+kable(
+  country_summary,
+  col.names = c("Country", "Player Count", "Total Earnings (USD)"),
+  caption = "Country Summary: Player Count and Total Earnings"
+)
+
+```
+With these two bar chats and the summary table, we could conclude that China has the highest number of players (139), followed by the United States (59) and Korea, Republic of (44) in the last 365 days.China also leads in total earnings, with over 31.6 million USD, other high-earning countries like United States (Over 10.4 million USD)and Russian Federation(Over 6.1 million USD).On the one hand, countries such as Germany, Ukraine, and France have fewer players but significant earnings, reflecting the success of specific individuals or teams.On the other hand,a large number of countries, including Estonia, Indonesia, and Spain, have one or two players contributing modest earnings.
+
+### Heatmaps
+Moreover,to visualize this better, let's put 'the top 500 earnings in the last 365 days' data in a map to present the heatmap.Howover,we need to re-match the countries' name with world_map data set first,before we draw the heatmap.
+```{r}
+
+#  Prepare map data
+world_map <- map_data("world")
+
+# Extract unique country names from your data
+unique_countries <- unique(top500_365$Country)
+
+# Extract unique country names from the map data
+world_map <- map_data("world")
+map_countries <- unique(world_map$region)
+
+# Identify mismatches
+mismatched_countries <- setdiff(unique_countries, map_countries)
+
+# Print mismatched countries for manual inspection
+print(mismatched_countries)
+
+
+```
+Then we re-code these countries as the matched countries name.
+```{r}
+top500_365$Country <- recode(top500_365$Country, 
+                             "Taiwan, Republic of China" = "Taiwan",
+                             "United States" = "USA",
+                             "Russian Federation" = "Russia",
+                             "Korea, Republic of" = "South Korea",
+                             "Hong Kong" = "Hong Kong SAR China",
+                             "Moldova, Republic of" = "Moldova",
+                             "United Kingdom" = "UK",
+                             "Iran, Islamic Republic of" = "Iran",
+                             "Macao" = "Macau")
+```
+Now,we can draw the maps.
+```{r}
+# Aggregate data by country
+country_summary <- top500_365 %>%
+  group_by(Country) %>%
+  summarise(
+    Player_Count = n(),  # Count the number of players
+    Total_Earnings = sum(`Total..Last.365.Days.`, na.rm = TRUE)  # Sum up earnings
+  )
+# Merge map data with the aggregated dataset
+map_data_merged <- world_map %>%
+  left_join(country_summary, by = c("region" = "Country"))  # Match country names
+
+# Plot the heatmap for Total Earnings with viridis colors
+ggplot(data = map_data_merged, aes(x = long, y = lat, group = group, fill = Total_Earnings)) +
+  geom_polygon(color = "white") +
+  scale_fill_viridis_c(
+    option = "viridis",  # Choose the viridis palette
+    na.value = "gray90", 
+    name = "Total Earnings (USD)"
+  ) +
+  labs(
+    title = "Total Earnings by Country (Last 365 Days)",
+    x = "",
+    y = ""
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  )
+
+#  Plot heatmap for Player Count with viridis colors
+ggplot(data = map_data_merged, aes(x = long, y = lat, group = group, fill = Player_Count)) +
+  geom_polygon(color = "white") +
+  scale_fill_viridis_c(
+    option = "viridis",  # Choose the viridis palette
+    na.value = "gray90", 
+    name = "Player Count"
+  ) +
+  labs(
+    title = "Number of Players by Country (Last 365 Days)",
+    x = "",
+    y = ""
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  )
+```
+Combining these two maps and the charts above, we can also find that countries with more players generally have higher total earnings. However, some regions with fewer players still achieve significant earnings, suggesting high-performing individuals or teams.Bright yellow regions(China) clearly mark global leaders in e-sports. More in-depth, the electronics industry seems to be relatively poor in Africa, compared to Asia, the Americas and Europe, where it thrives.
+
+
+## Longitudinal comparison
+After the horizontal comparison, let's look at the longitudinal analysis from the time dimension.We firstly draw the overall earning trend from 2018 to 2024.
+```{r}
+# Step 1: Summarize yearly earnings
+yearly_earnings <- earnings_country %>%
+  group_by(Year) %>%
+  summarize(Total_Earnings = sum(Overall_Earnings, na.rm = TRUE))
+
+# Step 2: Plot the trend line
+ggplot(yearly_earnings, aes(x = Year, y = Total_Earnings)) +
+  geom_line(color = "orange", size = 1) +
+  geom_point(color = "red", size = 2) +
+  labs(
+    title = "Total Earnings Trends Over Time (2018-2024)",
+    x = "Year",
+    y = "Total Earnings (USD)"
+  ) +
+  theme_minimal()
+```
+From the plot,we could find that the total earnings increased significantly from 2018 to 2019, indicating a growing interest or investment in the industry during this period.However,there was a steep drop in total earnings in 2020. This could be attributed to disruptions caused by the global COVID-19 pandemic, which affected live tournaments and events—a significant revenue source for e-sports.Later,earnings rebounded dramatically in 2021, reaching one of the highest points during the observed period. This suggests adaptation to new models such as online tournaments or increased digital engagement.After following the peak in 2021, there is a steady decline in earnings through 2022 to 2024. This could indicate market saturation, reduced growth, or shifts in audience engagement and sponsorship trends.More specifically, We choose the top 10 countries from 2018 to 2024 to analysis the earning trend.
+
+```{r}
+# Step 1: Summarize yearly earnings by country
+yearly_country_earnings <- earnings_country %>%
+  group_by(Year, Countries) %>%
+  summarize(Total_Earnings = sum(Overall_Earnings, na.rm = TRUE), .groups = "drop")
+
+# Step 2: Identify the top 10 countries by total earnings
+top_countries <- yearly_country_earnings %>%
+  group_by(Countries) %>%
+  summarize(Total_Earnings = sum(Total_Earnings, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(Total_Earnings)) %>%
+  slice_head(n = 10)  # Select the top 10 countries
+
+# Step 3: Filter the data for only the top 10 countries
+top_country_trends <- yearly_country_earnings %>%
+  filter(Countries %in% top_countries$Countries)
+
+# Step 4: Plot yearly trends for the top 10 countries
+ggplot(top_country_trends, aes(x = Year, y = Total_Earnings, color = Countries)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "Yearly Earnings Trends for Top 10 Countries (2018-2024)",
+    x = "Year",
+    y = "Total Earnings (USD)",
+    color = "Country"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    legend.position = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.size = unit(0.6, "cm")  # Adjust legend key size for better fit
+  )
+```
+China and the United States are the clear leaders in e-sports earnings, with a peak in 2021. Other countries like Korea, the United Kingdom, and the Russian Federation show moderate performance. The COVID-19 pandemic appears to have caused disruptions in 2020, followed by recovery in 2021 and a gradual decline thereafter.In addition to the country level, we can also analyze the changing trends in the game.we choose the overall top 10 in terms of combined earnings over the 5 years (2018-2024) as our TOP game.
+
+```{r}
+# top 10 games
+top_games <- earnings_topgame %>%
+  group_by(Game) %>%
+  summarize(Total_Earnings = sum(Total_Earnings)) %>%
+  arrange(desc(Total_Earnings)) %>%
+  head(10) %>%
+  pull(Game)
+
+
+top_game_trends <- earnings_topgame %>%
+  filter(Game %in% top_games)
+
+# plot
+ggplot(top_game_trends, aes(x = Year, y = Total_Earnings, color = Game)) +
+  geom_line(size = 1) +  
+  geom_point(size = 1.5) +  
+  scale_color_viridis_d(option = "plasma", name = "Game") +  # Use a high-contrast "plasma" palette
+  labs(
+    title = "Trends for Top 10 Games (2018-2024)",
+    x = "Year",
+    y = "Total Earnings (USD)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+
+```
+From the top 10 games plot, Dota 2 consistently dominates the earnings chart, peaking significantly in 2018 with approximately $80 million. Despite some fluctuations, it remains a top contributor throughout the years.Fortnite shows a sharp rise post-2018, maintaining a high earnings level in subsequent years. It competes closely with Dota 2, especially around 2020-2022.Both games display relatively stable earnings over the years. Counter-Strike maintains a steady climb, while League of Legends has smaller but consistent earnings.Valorant and PLAYERUNKNOWN'S BATTLEGROUNDS (PUBG Mobile) show noticeable growth after 2020, reflecting the growing popularity of these titles in the e-sports market.Meanwhile, games like Rocket League and Rainbow Six Siege exhibit declining trends in earnings, especially post-2022, indicating reduced popularity or competitive activity.
+
+For the overall trend:Similar to the country level, most games in 2020 saw a significant decline, likely due to the impact of global events such as the COVID-19 pandemic. However, certain games recovered quickly, showing the resilience of the eSports market.
+
+# Discussion
+The analysis of global e-sports trends from 2018 to 2024, as well as a cross-sectional analysis of individual players, provides a comprehensive view of the industry's growth across multiple dimensions, including country-level performance, game-level dynamics, and player achievements. Findings from a variety of visualizations and tables reveal the global distribution of e-sports earnings, as well as the significant contributions of specific regions, games, and players.
+
+* Dominance of China: China consistently leads in both player count and total earnings. With its extensive infrastructure, investment in e-sports, and a growing base of professional players, it outpaces other countries like the United States and Korea, which also show strong performance.
+* Yearly Earnings Variations: While most countries follow the overall trend of a dip in 2020 due to the COVID-19 pandemic, countries with robust online tournament infrastructure, like the United States and Korea, demonstrated faster recover.
+* Smaller Countries Punching Above Their Weight: Countries like Denmark and Brazil rank highly relative to their size, suggesting concentrated investments in competitive gaming and the presence of highly skilled players in niche areas.
+* Top Players: The top 10 players globally are overwhelmingly from Dota 2, reflecting the disproportionate prize pool distribution. These players have collectively earned millions, with some individuals like N0tail earning upwards of $7 million.
+* Recent Performers: An analysis of the last 365 days highlights new rising stars and demonstrates how earnings are becoming more distributed across different games and players.
+
+# Limitations
+However,there are still some limitations in the analysis.First,only top-performing players, countries, and games are analyzed, leaving mid-tier or niche contributors unexamined.Second,geographical mapping revealed challenges with inconsistent country names, requiring manual adjustments. This process may have introduced inaccuracies or omitted certain countries.Third, the analysis spans 2018 to 2024, which limits the understanding of long-term trends in the industry, especially before 2018 or potential future projections beyond 2024.
+
+# Conclusion
+This analysis highlights the dynamic growth and evolution of the global e-sports industry from 2018 to 2024, offering insights into the contributions of countries, games, and individual players. The findings demonstrate a highly competitive landscape shaped by significant regional dominance, the sustained popularity of flagship games, and the emergence of new titles.China has firmly established itself as the leader in e-sports, excelling in both player count and total earnings. The United States and Korea also remain pivotal, leveraging robust infrastructures and a rich history of competitive gaming. At the same time, smaller countries such as Denmark and Brazil show that strategic investments and focused efforts can result in outsized influence in the e-sports area. Emerging titles like Valorant and PUBG Mobile suggest potential for diversification, while regional investment in infrastructure and online tournaments provides a pathway for smaller countries to rise in prominence.
+
+Trends over time reflect resilience in the face of challenges like the COVID-19 pandemic, which caused a sharp dip in 2020 earnings. The industry's recovery in subsequent years highlights its ability to adapt to changing circumstances, such as shifting from in-person tournaments to online formats. This adaptability has solidified e-sports as a durable and growing sector.
+
+In summary, the e-sports industry is at an exciting crossroads, characterized by growth, innovation, and challenges. Stakeholders must focus on diversifying revenue sources, investing in smaller regions, and supporting emerging games to ensure long-term sustainability and inclusivity in this rapidly evolving global phenomenon.
+
+
