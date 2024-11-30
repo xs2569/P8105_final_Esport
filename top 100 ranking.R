@@ -24,7 +24,7 @@ data_overall <- data.frame(
   Percent_of_Total = percent_of_total,
   stringsAsFactors = FALSE
 )
-
+data_overall$Rank <- as.numeric(gsub("\\.", "", data_overall$Rank))
 print(head(data_overall, 20))
 
 write.csv(data_overall, "esports_earnings_top100_overall.csv", row.names = FALSE)
@@ -63,5 +63,35 @@ colnames(data) <- c("Rank", "Country", "Total_Earnings", "Number_of_Players", "T
 # 打印前几行数据
 print(head(data, 10))
 
+library(rvest)
+library(dplyr)
 
+library(RSelenium)
 
+library(RSelenium)
+
+# 启动 Selenium 服务
+rD <- rsDriver(browser = "chrome", chromever = "latest")
+remDr <- rD$client
+
+# 确保 URL 是正确格式的单一字符串
+url <- 'https://escharts.com/players?game=lol'
+
+# 打开网页
+remDr$navigate(url)
+
+# 检查是否导航成功
+Sys.sleep(5)
+
+# 抓取页面源代码
+page_source <- remDr$getPageSource()[[1]]
+
+# 使用 rvest 解析页面
+library(rvest)
+webpage <- read_html(page_source)
+
+# 在这里继续抓取数据...
+
+# 关闭 Selenium
+remDr$close()
+rD$server$stop()
